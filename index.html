@@ -38,7 +38,7 @@
 
   <div class="wrap">
     <h1>Room Allocation</h1>
-    <div class="hint">Using existing rooms schema: (id, block, name, ranges, capacity, active)</div>
+    <div class="hint">Existing rooms schema: (id, block, name, ranges, capacity, active)</div>
 
     <div class="tabs">
       <button class="tab active" id="tab-allocate">Allocate</button>
@@ -47,7 +47,7 @@
       <button class="tab" id="tab-admin">Admin</button>
     </div>
 
-    <!-- Allocate (range-aware) -->
+    <!-- Allocate (date range + split) -->
     <section id="allocate" class="card">
       <h2>Allocate — Assign Room to Guest (Date Range)</h2>
       <div class="grid three">
@@ -76,8 +76,7 @@
         <div><label>Booking ID (filter)</label><input id="av-booking" placeholder="e.g., BKG-2025-001" /></div>
         <div><label>Block (filter)</label><input id="av-block" placeholder="e.g., Block A" /></div>
         <div>
-          <label>Date</label>
-          <input type="date" id="av-date" />
+          <label>Date</label><input type="date" id="av-date" />
           <label style="margin-top:6px"><input type="checkbox" id="av-ignore" /> Show all dates (ignore date)</label>
         </div>
       </div>
@@ -111,13 +110,13 @@
       </table>
     </section>
 
-    <!-- Admin (Supabase-stored password) -->
+    <!-- Admin (RPC password check) -->
     <section id="admin" class="card" style="display:none">
       <h2>Admin — Add Pre‑Booked Slot</h2>
       <div id="admin-gate" class="gate">
         <input id="admin-pass" placeholder="Enter admin password" />
         <button id="btn-admin-unlock" class="primary">Unlock</button>
-        <div class="hint" id="admin-hint"></div>
+        <div class="hint" id="admin-hint">Password is verified server-side (RPC).</div>
       </div>
 
       <div id="admin-body" style="display:none">
@@ -179,32 +178,15 @@
     tabs.allocated.tab.onclick = () => show('allocated');
     tabs.admin.tab.onclick = () => show('admin');
 
-    // ===== Admin Gate (password stored in Supabase app_settings) =====
+    // ===== Admin Gate: RPC verify_admin_pass =====
     const adminGate = document.getElementById('admin-gate');
     const adminBody = document.getElementById('admin-body');
     const adminPassInput = document.getElementById('admin-pass');
-    const adminHint = document.getElementById('admin-hint');
-
-    let SERVER_ADMIN_PASS = null;
-    //anusha
-    const { data, error } = await sb
-  .from('app_settings')
-  .select('value')
-  .eq('key', 'admin_password')
-  .single();
-    //
-    async function fetchAdminPass() {
-      const { data, error } = await sb.from('app_settings').select('value').eq('key', 'admin_pass').maybeSingle();
-      if (error) { adminHint.textContent = 'Could not load admin password from Supabase.'; return; }
-      SERVER_ADMIN_PASS = data?.value || null;
-      if (!SERVER_ADMIN_PASS) adminHint.textContent = 'No admin password set in Supabase.';
-      else adminHint.textContent = '';
-    }
-    await fetchAdminPass();
-
-    document.getElementById('btn-admin-unlock').onclick = () => {
-      if (!SERVER_ADMIN_PASS) { alert('Admin password not set in Supabase.'); return; }
-      if ((adminPassInput.value || '') === SERVER_ADMIN_PASS) {
+    document.getElementById('btn-admin-unlock').onclick = async () => {
+      const pass = (adminPassInput.value || '');
+      const { data, error } = await sb.rpc('verify_admin_pass', { p_pass: pass });
+      if (error) { alert('Error verifying password: ' + error.message); return; }
+      if (data === true) {
         localStorage.setItem('RA_ADMIN_OK', '1');
         adminGate.style.display = 'none';
         adminBody.style.display = '';
@@ -331,14 +313,12 @@
           const slot = (available.find(x => x.id === id));
           if (!slot) { alert('Slot not found'); return; }
 
-          // exact match
           if (slot.start_date === from && slot.end_date === to) {
             const { error } = await sb.from('allocations').insert({ availability_id: id, guest_name: g, mobile: m });
             if (error) alert('Allocation failed: ' + error.message); else { alert('Allocated!'); btnFind.click(); }
             return;
           }
 
-          // create subrange
           const { data: newAvail, error: newErr } = await sb.from('room_availability')
             .insert({ room_id: slot.room_id, booking_id: slot.booking_id, start_date: from, end_date: to })
             .select('id')
@@ -370,14 +350,13 @@
       });
     };
 
-    // ===== Available: date view default (checkbox to show all) =====
+    // ===== Available (date default; optional show all) =====
     const avBooking = document.getElementById('av-booking');
     const avBlock   = document.getElementById('av-block');
     const avDate    = document.getElementById('av-date');
     const avIgnore  = document.getElementById('av-ignore');
     const btnLoadAvailable = document.getElementById('btn-load-available');
     const availableRows = document.getElementById('available-rows');
-
     if (btnLoadAvailable) btnLoadAvailable.onclick = loadAvailableRows;
 
     async function loadAvailableRows() {
