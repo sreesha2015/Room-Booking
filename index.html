@@ -1,945 +1,335 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script type="module" src="./supabase-client.js"></script>
-
   <meta charset="utf-8" />
-  <title>Room Booking — Tabs + Next Availability + Admin Rename/Delete </title>
   <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Room Allocation — Supabase Starter</title>
   <style>
-    :root { --bg:#0b1220; --card:#121a2b; --muted:#8aa0c6; --text:#e9eefc; --accent:#4da3ff; --accent-2:#6dd3ff; }
-    *{box-sizing:border-box} body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#0b1220,#0b1220 200px,#0e1630); color:var(--text)}
-    .wrap{max-width:1200px;margin:32px auto;padding:16px}
-    h1{font-size:28px;margin:0 0 10px}
-    .pill{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;border-radius:999px;background:#0e1730;border:1px solid #2a3960;color:#a9c1ef;font-size:12px}
-    .card{background:var(--card);border:1px solid #1e2740;border-radius:16px;padding:16px;box-shadow:0 10px 30px rgba(0,0,0,.25);margin-bottom:16px}
-    .grid{display:grid;grid-template-columns:repeat(12,1fr);gap:12px}
-    label{font-size:12px;color:var(--muted);display:block;margin-bottom:6px}
-    input,select,button,textarea{width:100%;padding:12px;border-radius:12px;border:1px solid #283556;background:#0f1730;color:var(--text)}
-    input::placeholder,textarea::placeholder{color:#6d81ab}
-    button{cursor:pointer;background:var(--accent);border-color:transparent;color:#071121;font-weight:600}
-    button.ghost{background:transparent;border:1px solid #2d3a5f;color:#a9c1ef}
-    button.danger{background:#ff6b6b;color:#190b0b}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
-    .muted{color:#9ab3e0}.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Monaco,Consolas,monospace}
-    .list{width:100%;border-collapse:collapse;margin-top:8px}
-    .list th,.list td{padding:10px;border-bottom:1px solid #223054;text-align:left}
-    .hint{font-size:12px;color:#9ab3e0;margin-top:6px}
-    .warn{color:#ffd27d}
-    /* Tabs */
-    .tabs{display:flex;gap:8px;margin:8px 0 16px}
-    .tab-btn{padding:10px 14px;border-radius:12px;border:1px solid #2d3a5f;background:#0f1730;color:#a9c1ef;cursor:pointer}
-    .tab-btn.active{background:var(--accent);color:#071121;border-color:transparent}
-    .tab-panel{display:none}
-    .tab-panel.active{display:block}
-    /* Admin lock overlay */
-    .admin-locked{position:relative;filter:saturate(.6) opacity(.9)}
-    .admin-locked::after{
-      content:"Admin Locked — unlock to edit"; position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-      background:rgba(9,12,24,.65); border-radius:16px; font-weight:700; letter-spacing:.2px
-    }
+    :root { --bg:#0b1220; --card:#111a2b; --muted:#8aa0c6; --text:#e9eefc; --accent:#4da3ff; --accent2:#6dd3ff; }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial;background:linear-gradient(180deg,#0b1220,#0b1220 220px,#0e1630);color:var(--text)}
+    .wrap{max-width:1100px;margin:24px auto;padding:16px}
+    h1{font-size:26px;margin:0 0 8px}
+    .tabs{display:flex;gap:8px;margin:16px 0}
+    .tab{padding:10px 14px;border-radius:999px;background:#0f1830;border:1px solid #1a2746;cursor:pointer;color:#cfe3ff}
+    .tab.active{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#0b1220;font-weight:700}
+    .grid{display:grid;gap:12px}
+    .two{grid-template-columns:1fr 1fr}
+    .three{grid-template-columns:repeat(3,1fr)}
+    .card{background:var(--card);border:1px solid #1a2746;border-radius:16px;padding:16px;box-shadow:0 2px 12px rgba(0,0,0,0.25)}
+    label{display:block;font-size:12px;color:#a9bde4;margin-bottom:6px}
+    input,select{width:100%;padding:10px;border-radius:10px;background:#0e1730;border:1px solid #203056;color:#eaf2ff}
+    button{padding:10px 14px;border-radius:12px;border:1px solid #29477a;background:linear-gradient(90deg,#1a335d,#1d3f79);color:#eaf2ff;cursor:pointer}
+    button.primary{background:linear-gradient(90deg,var(--accent),var(--accent2));color:#0a1222;border:none}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:10px;border-bottom:1px solid #23365f;text-align:left;font-size:14px}
+    .pill{padding:4px 8px;border-radius:999px;background:#13234a;border:1px solid #24407b;font-size:12px}
+    .ok{background:#0e3a2f;border-color:#1b6f5a}
+    .warn{background:#402313;border-color:#8a3a24}
+    .row{display:flex;gap:8px;align-items:center}
+    .spacer{height:8px}
+    .hint{color:#9fb7e6;font-size:12px}
+    .right{float:right}
   </style>
 </head>
 <body>
-  <div class="wrap">
-    <h1>
-      Room Booking 
-      <span class="pill" style="margin-left:8px">Storage: localStorage</span>
-      <span class="pill" style="margin-left:8px">Intervals: <b>[From, To)</b></span>
-    </h1>
+  <!-- load Supabase client (defines window.sb) -->
+  <script type="module" src="./supabaseClient.js"></script>
 
-    <!-- Tabs -->
+  <div class="wrap">
+    <h1>Room Allocation</h1>
+    <div class="hint">Admin enters pre-booked slots. Users allocate rooms to guests. Double-booking is prevented.</div>
+
     <div class="tabs">
-      <button class="tab-btn active" data-tab="bookTab">Book</button>
-      <button class="tab-btn" data-tab="availTab">Available</button>
-      <button class="tab-btn" data-tab="adminTab">Admin</button>
+      <button class="tab active" id="tab-admin">Admin</button>
+      <button class="tab" id="tab-allocate">Allocate</button>
     </div>
 
-    <!-- BOOK TAB -->
-    <section id="bookTab" class="tab-panel active">
-      <div class="card">
-        <div class="grid">
-          <div style="grid-column: span 3;">
-            <label for="blockFilter">Block</label>
-            <select id="blockFilter"><option value="">All Blocks</option></select>
-          </div>
-          <div style="grid-column: span 3;">
-            <label for="fromDate">From (check-in)</label>
-            <input type="date" id="fromDate" />
-          </div>
-          <div style="grid-column: span 3;">
-            <label for="toDate">To (check-out)</label>
-            <input type="date" id="toDate" />
-          </div>
-          <div style="grid-column: span 3; align-self:end;">
-            <button id="suggestBtn" class="ghost">Suggest Dates</button>
-          </div>
-
-          <div style="grid-column: span 6;">
-            <label for="roomSelect">Room (effective availability)</label>
-            <select id="roomSelect"><option value="">Select dates first</option></select>
-            <div id="roomAvailHint" class="hint"></div>
-          </div>
-          <div style="grid-column: span 3;">
-            <label for="guestName">Guest Name</label>
-            <input id="guestName" type="text" placeholder="e.g., Asha Kumar" />
-          </div>
-          <div style="grid-column: span 3;">
-            <label for="guestPhone">Phone</label>
-            <input id="guestPhone" type="tel" placeholder="e.g., 9876543210" />
-          </div>
-          <div style="grid-column: span 12; display:flex; justify-content:space-between; align-items:center;">
-            <div id="whyDisabled" class="hint warn"></div>
-            <button id="bookBtn" disabled>Book</button>
-          </div>
+    <!-- Admin Card -->
+    <section id="admin" class="card">
+      <h2>Admin — Add Pre‑Booked Slot</h2>
+      <div class="grid three">
+        <div>
+          <label>Booking ID</label>
+          <input id="a-booking" placeholder="e.g., BKG-2025-001" />
         </div>
-        <div class="hint">If a room had availability <b>10→12</b> and someone books <b>10→11</b>, the leftover <b>11→12</b> becomes available instantly.</div>
+        <div>
+          <label>Block Name</label>
+          <input id="a-block" placeholder="e.g., Block A" />
+        </div>
+        <div>
+          <label>Room No</label>
+          <input id="a-room" placeholder="e.g., 105" />
+        </div>
+      </div>
+      <div class="grid two" style="margin-top:10px">
+        <div>
+          <label>Start Date</label>
+          <input type="date" id="a-start" />
+        </div>
+        <div>
+          <label>End Date</label>
+          <input type="date" id="a-end" />
+        </div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button id="btn-add" class="primary">Add Slot</button>
+        <div id="admin-msg" class="hint"></div>
       </div>
 
-      <div class="card">
-        <h2 style="margin:0 0 8px;font-size:20px">Bookings</h2>
-        <table class="list" id="bookingTable">
-          <thead>
-            <tr>
-              <th>#</th><th>From</th><th>To</th><th>Nights</th><th>Block</th><th>Room</th><th>Guest</th><th>Phone</th><th></th>
-            </tr>
-          </thead>
-          <tbody id="bookingTbody">
-            <tr><td colspan="9" class="muted">No bookings yet.</td></tr>
-          </tbody>
-        </table>
+      <div class="spacer"></div>
+      <h3>All Slots</h3>
+      <div class="row">
+        <input id="f-booking-admin" placeholder="Filter by Booking ID (optional)" style="max-width:260px" />
+        <button id="btn-reload-admin">Reload</button>
       </div>
+      <div class="spacer"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Booking ID</th>
+            <th>Block</th>
+            <th>Room</th>
+            <th>Start</th>
+            <th>End</th>
+            <th>Status</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="admin-rows"></tbody>
+      </table>
     </section>
 
-    <!-- AVAILABLE TAB -->
-    <section id="availTab" class="tab-panel">
-      <div class="card">
-        <div class="grid">
-          <div style="grid-column: span 4;">
-            <label for="availBlock">Block</label>
-            <select id="availBlock"><option value="">All Blocks</option></select>
-          </div>
-          <div style="grid-column: span 8; align-self:end;">
-            <button id="availRefreshBtn">Refresh</button>
-            <label class="row" style="gap:6px; display:inline-flex; margin-left:10px; font-size:12px; color:#9ab3e0;">
-              <input type="checkbox" id="showNoAvail"> Include rooms with no upcoming availability
-            </label>
-          </div>
+    <!-- Allocate Card -->
+    <section id="allocate" class="card" style="display:none">
+      <h2>Allocate — Assign Room to Guest</h2>
+      <div class="grid three">
+        <div>
+          <label>Booking ID (filter)</label>
+          <input id="u-booking" placeholder="e.g., BKG-2025-001" />
         </div>
-        <div class="hint">Each row shows the room’s <b>next available slot from today</b> (effective availability).</div>
-      </div>
-
-      <div class="card">
-        <div class="row" style="justify-content:space-between;margin-bottom:6px">
-          <h2 style="margin:0;font-size:20px">Available Rooms (Next Slot)</h2>
-          <div class="row">
-            <span id="availCount" class="pill">0 found</span>
-          </div>
+        <div>
+          <label>Block (filter)</label>
+          <input id="u-block" placeholder="e.g., Block A" />
         </div>
-        <table class="list">
-          <thead>
-            <tr>
-              <th>#</th><th>Block</th><th>Room</th><th>Available From</th><th>Until</th><th>Nights</th><th>Actions</th>
-            </tr>
-          </thead>
-          <tbody id="availTbody">
-            <tr><td colspan="7" class="muted">Click Refresh to load.</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </section>
-
-    <!-- ADMIN TAB -->
-    <section id="adminTab" class="tab-panel">
-      <div class="card" id="adminHeaderCard">
-        <div class="row" style="justify-content:space-between;align-items:center">
-          <div class="row">
-            <h2 style="margin:0;font-size:20px">Admin</h2>
-            <span id="adminStatus" class="pill">Locked</span>
-          </div>
-          <div class="row">
-            <button id="adminUnlockBtn">Unlock</button>
-            <button id="adminLockBtn" class="ghost">Lock</button>
-          </div>
-        </div>
-        <div class="row" style="margin-top:8px">
-          <input id="adminPinInput" type="password" placeholder="Enter PIN (default 1234)" style="max-width:220px" />
-          <button id="adminPinSetBtn" class="ghost" title="Set/Change PIN (unlocked only)">Set/Change PIN</button>
-        </div>
-        <div class="hint">Admin can edit rooms/blocks & availability. Users can only book/cancel.</div>
-      </div>
-
-      <div id="adminContent">
-        <!-- Rooms + Availability + Room meta -->
-        <div class="card">
-          <div class="row" style="justify-content:space-between;margin-bottom:6px">
-            <h3 style="margin:0;font-size:18px">Rooms & Availability Ranges</h3>
-            <button id="addBlockRoomsBtn" class="ghost">+ Bulk Add Rooms</button>
-          </div>
-          <div class="grid">
-            <div style="grid-column: span 6;">
-              <label for="roomsList">Rooms (select to edit)</label>
-              <select id="roomsList" size="12" class="mono"></select>
-              <div class="hint">Format: BLOCK / ROOM — (#ranges)</div>
-            </div>
-            <div style="grid-column: span 6;">
-              <label for="rangesText">Availability Ranges</label>
-              <textarea id="rangesText" rows="8" placeholder="One per line: YYYY-MM-DD to YYYY-MM-DD"></textarea>
-              <div class="row" style="margin-top:8px">
-                <button id="saveRangesBtn">Save Ranges</button>
-                <button id="sampleRangesBtn" class="ghost">Sample: next 2 ranges</button>
-              </div>
-              <hr style="border-color:#24345a;border-top:none;margin:16px 0">
-              <h4 style="margin:0 0 8px;font-size:16px">Room details</h4>
-              <div class="grid">
-                <div style="grid-column: span 4;">
-                  <label for="roomBlockInput">Block</label>
-                  <input id="roomBlockInput" type="text" placeholder="e.g., A" />
-                </div>
-                <div style="grid-column: span 8;">
-                  <label for="roomNameInput">Room Name</label>
-                  <input id="roomNameInput" type="text" placeholder="e.g., A-001" />
-                </div>
-              </div>
-              <div class="row" style="margin-top:8px">
-                <button id="roomMetaSaveBtn">Rename / Move Room</button>
-                <button id="roomDeleteBtn" class="danger">Delete Room</button>
-              </div>
-              <div class="hint">Rename/move updates existing bookings to the new Block/Room. Delete can also remove its bookings (with confirmation).</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- CSV -->
-        <div class="card">
-          <h3 style="margin:0 0 8px;font-size:18px">Bulk CSV Import (Availability)</h3>
-          <div class="grid">
-            <div style="grid-column: span 6;">
-              <label>Upload CSV (columns: block,room,from,to)</label>
-              <input id="csvFile" type="file" accept=".csv,text/csv" />
-              <div class="row" style="margin-top:8px">
-                <label class="row" style="gap:6px"><input type="checkbox" id="csvReplace"> Replace existing availability</label>
-                <button id="csvImportBtn">Import CSV</button>
-              </div>
-            </div>
-            <div style="grid-column: span 6;">
-              <div class="hint">Sample rows:<br><span class="mono">A,A-001,2025-09-02,2025-09-05</span><br><span class="mono">B,B-014,2025-09-10,2025-09-15</span></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Blackouts + Tools -->
-        <div class="card">
-          <h3 style="margin:0 0 8px;font-size:18px">Block Blackouts & Tools</h3>
-          <div class="grid">
-            <div style="grid-column: span 4;">
-              <label for="blackoutBlock">Block</label>
-              <select id="blackoutBlock"></select>
-            </div>
-            <div style="grid-column: span 8;">
-              <label for="blackoutText">Blackout Ranges</label>
-              <textarea id="blackoutText" rows="6" placeholder="YYYY-MM-DD to YYYY-MM-DD"></textarea>
-              <div class="row" style="margin-top:8px">
-                <button id="saveBlackoutBtn">Save Blackouts</button>
-                <button id="sampleBlackoutBtn" class="ghost">Sample range</button>
-              </div>
-            </div>
-
-            <div style="grid-column: span 12; margin-top:10px; padding-top:10px; border-top:1px solid #24345a">
-              <h4 style="margin:0 0 8px;font-size:16px">Rename Block</h4>
-              <div class="grid">
-                <div style="grid-column: span 4;">
-                  <label for="blockRenameOld">Old Block</label>
-                  <select id="blockRenameOld"></select>
-                </div>
-                <div style="grid-column: span 5;">
-                  <label for="blockRenameNew">New Block</label>
-                  <input id="blockRenameNew" type="text" placeholder="e.g., G" />
-                </div>
-                <div style="grid-column: span 3; align-self:end;">
-                  <button id="blockRenameBtn">Rename Block</button>
-                </div>
-              </div>
-              <div class="hint">Moves all rooms to the new block, updates their bookings, and transfers blackouts. Prevents name collisions.</div>
-            </div>
-          </div>
-
-          <div class="row" style="margin-top:12px">
-            <button id="exportCsvBtn">Export Bookings CSV</button>
-            <button id="resetBtn" class="ghost">Reset ALL Data</button>
-          </div>
+        <div>
+          <label>Date Needed</label>
+          <input type="date" id="u-date" />
         </div>
       </div>
+      <div class="row" style="margin-top:12px">
+        <button id="btn-find" class="primary">Find Available</button>
+        <div id="user-msg" class="hint"></div>
+      </div>
+
+      <div class="spacer"></div>
+      <table>
+        <thead>
+          <tr>
+            <th>Booking ID</th>
+            <th>Block</th>
+            <th>Room</th>
+            <th>Start–End</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="user-rows"></tbody>
+      </table>
     </section>
   </div>
 
   <script type="module">
-    import { db } from './supabase-client.js'; window.db = window.db || db;
-    // ======= Storage Keys =======
-    const LS_KEYS = {
-      ROOMS: 'rb7_rooms_v1',
-      BOOKINGS: 'rb7_bookings_v1',
-      BLACKOUTS: 'rb7_blackouts_v1',
-      ADMIN_PIN: 'rb7_admin_pin'
+    // Wait for Supabase client
+    const waitForSB = () => new Promise((resolve) => {
+      if (window.sb) return resolve(window.sb);
+      const i = setInterval(() => { if (window.sb) { clearInterval(i); resolve(window.sb); } }, 50);
+    });
+
+    const sb = await waitForSB();
+
+    // Tab switching
+    const tabAdmin = document.getElementById('tab-admin');
+    const tabAllocate = document.getElementById('tab-allocate');
+    const secAdmin = document.getElementById('admin');
+    const secAllocate = document.getElementById('allocate');
+
+    function show(tab) {
+      if (tab === 'admin') {
+        tabAdmin.classList.add('active');
+        tabAllocate.classList.remove('active');
+        secAdmin.style.display = '';
+        secAllocate.style.display = 'none';
+        loadAdminRows();
+      } else {
+        tabAllocate.classList.add('active');
+        tabAdmin.classList.remove('active');
+        secAllocate.style.display = '';
+        secAdmin.style.display = 'none';
+      }
+    }
+    tabAdmin.onclick = () => show('admin');
+    tabAllocate.onclick = () => show('allocate');
+
+    // Admin: Add Slot
+    const aBooking = document.getElementById('a-booking');
+    const aBlock   = document.getElementById('a-block');
+    const aRoom    = document.getElementById('a-room');
+    const aStart   = document.getElementById('a-start');
+    const aEnd     = document.getElementById('a-end');
+    const aMsg     = document.getElementById('admin-msg');
+    const btnAdd   = document.getElementById('btn-add');
+
+    btnAdd.onclick = async () => {
+      aMsg.textContent = '';
+      const booking_id = aBooking.value.trim();
+      const block_name = aBlock.value.trim();
+      const room_no    = aRoom.value.trim();
+      const start_date = aStart.value;
+      const end_date   = aEnd.value;
+      if (!booking_id || !block_name || !room_no || !start_date || !end_date) {
+        aMsg.textContent = 'Fill all fields.'; return;
+      }
+      if (end_date < start_date) { aMsg.textContent = 'End date cannot be before start date.'; return; }
+
+      // Upsert room
+      const { data: roomUpsert, error: roomErr } = await sb
+        .from('rooms')
+        .upsert({ block_name, room_no }, { onConflict: 'block_name,room_no' })
+        .select('id')
+        .single();
+      if (roomErr) { aMsg.textContent = 'Room upsert failed: ' + roomErr.message; return; }
+
+      // Insert availability slot
+      const { error: avErr } = await sb.from('room_availability').insert({
+        room_id: roomUpsert.id, booking_id, start_date, end_date
+      });
+      if (avErr) { aMsg.textContent = 'Add slot failed: ' + avErr.message; return; }
+
+      aMsg.textContent = 'Slot added.';
+      aRoom.value = ''; aStart.value = ''; aEnd.value = '';
+      loadAdminRows();
     };
 
-    // ======= Helpers =======
-    const $ = id => document.getElementById(id);
-    const parseISO = s => new Date(s+'T00:00:00');
-    const fmtISO = d => new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);
-    const nights = (f,t) => Math.max(0, Math.round((parseISO(t) - parseISO(f))/86400000));
-    const validDate = d => /^\d{4}-\d{2}-\d{2}$/.test(d);
-    const sortBy = (arr, f) => arr.slice().sort((a,b)=> (f(a)>f(b)) - (f(a)<f(b)));
-    const uc = s => (s||'').trim().toUpperCase();
+    // Admin: List all slots with status
+    const adminRows = document.getElementById('admin-rows');
+    const fBookingAdmin = document.getElementById('f-booking-admin');
+    document.getElementById('btn-reload-admin').onclick = loadAdminRows;
 
-    function mergeRanges(ranges){
-      if(!ranges.length) return [];
-      const s = ranges
-        .filter(r=> validDate(r.from)&&validDate(r.to)&&parseISO(r.from)<parseISO(r.to))
-        .sort((a,b)=> a.from.localeCompare(b.from) || a.to.localeCompare(b.to));
-      const out=[{...s[0]}];
-      for(let i=1;i<s.length;i++){
-        const prev=out[out.length-1], cur=s[i];
-        if(parseISO(prev.to) >= parseISO(cur.from)){
-          if(parseISO(cur.to) > parseISO(prev.to)) prev.to = cur.to;
-        } else { out.push({...cur}); }
-      }
-      return out;
-    }
-    function unionContainsRange(mergedRanges, from, to){
-      if(!mergedRanges.length) return false;
-      let cursor = parseISO(from);
-      const target = parseISO(to);
-      for(const r of mergedRanges){
-        const rf=parseISO(r.from), rt=parseISO(r.to);
-        if(rf > cursor) return false;
-        if(rt > cursor) cursor = rt;
-        if(cursor >= target) return true;
-      }
-      return cursor >= target;
-    }
-    function subtractRange(ranges, cutFrom, cutTo){
-      const CF = parseISO(cutFrom), CT = parseISO(cutTo);
-      const out = [];
-      for(const r of mergeRanges(ranges)){
-        const RF = parseISO(r.from), RT = parseISO(r.to);
-        if(!(RF < CT && CF < RT)){ out.push(r); continue; }
-        if(RF < CF) out.push({from: fmtISO(RF), to: fmtISO(CF)});
-        if(CT < RT) out.push({from: fmtISO(CT), to: fmtISO(RT)});
-      }
-      return mergeRanges(out);
-    }
-    function effectiveRanges(room){
-      let eff = mergeRanges(room.ranges);
-      const blk = mergeRanges(blackouts[room.block] || []);
-      for(const b of blk){ eff = subtractRange(eff, b.from, b.to); if(!eff.length) break; }
-      const rb = bookings.filter(b=> b.roomId === room.id);
-      for(const bk of rb){ eff = subtractRange(eff, bk.from, bk.to); if(!eff.length) break; }
-      return eff;
-    }
-    function parseRangeLine(line){
-      const parts = [...line.matchAll(/(\d{4}-\d{2}-\d{2})/g)].map(m=>m[1]);
-      if(parts.length >= 2){
-        const from = parts[0], to = parts[1];
-        if(validDate(from) && validDate(to) && parseISO(from) < parseISO(to)) return {from, to};
-      }
-      return null;
-    }
+    async function loadAdminRows() {
+      adminRows.innerHTML = '<tr><td colspan="7">Loading…</td></tr>';
+      let q = sb.from('room_availability')
+        .select('id, booking_id, start_date, end_date, rooms:room_id(id, block_name, room_no), allocations(id)')
+        .order('start_date', { ascending: true });
 
-    // ======= Data =======
-    function loadRooms(){ return window.db.fetchRooms(); }-${String(i).padStart(3,'0')}`,ranges:[]}); }});
-      localStorage.setItem(LS_KEYS.ROOMS, JSON.stringify(arr)); return arr;
-    }
-    async function saveRooms(r){ await window.db.upsertRooms(r); }
-    function loadBookings(){ return window.db.fetchBookings(); }
-    async function saveBookings(b){ /* no-op: insert/delete per operation */ }
-    function loadBlackouts(){ return window.db.fetchBlackouts(); }; }
-    async function saveBlackouts(b){ await window.db.saveBlackouts(b); }
+      const f = fBookingAdmin.value.trim();
+      if (f) q = q.eq('booking_id', f);
 
-    let rooms=[]; let bookings=[]; let blackouts={};
-    let adminUnlocked = false;
+      const { data, error } = await q;
+      if (error) { adminRows.innerHTML = `<tr><td colspan="7">${error.message}</td></tr>`; return; }
 
-    // ======= UI Refs (BOOK) =======
-    const blockFilter=$('blockFilter'), fromDate=$('fromDate'), toDate=$('toDate'), suggestBtn=$('suggestBtn'),
-          roomSelect=$('roomSelect'), roomAvailHint=$('roomAvailHint'),
-          guestName=$('guestName'), guestPhone=$('guestPhone'), bookBtn=$('bookBtn'), whyDisabled=$('whyDisabled'),
-          bookingTbody=$('bookingTbody');
-
-    // ======= UI Refs (AVAILABLE) =======
-    const availBlock=$('availBlock'), availRefreshBtn=$('availRefreshBtn'), showNoAvail=$('showNoAvail'),
-          availTbody=$('availTbody'), availCount=$('availCount');
-
-    // ======= UI Refs (ADMIN) =======
-    const adminStatus=$('adminStatus'), adminUnlockBtn=$('adminUnlockBtn'), adminLockBtn=$('adminLockBtn'),
-          adminPinInput=$('adminPinInput'), adminPinSetBtn=$('adminPinSetBtn'),
-          adminContent=$('adminContent'),
-          roomsList=$('roomsList'), rangesText=$('rangesText'), saveRangesBtn=$('saveRangesBtn'),
-          sampleRangesBtn=$('sampleRangesBtn'), addBlockRoomsBtn=$('addBlockRoomsBtn'),
-          csvFile=$('csvFile'), csvImportBtn=$('csvImportBtn'), csvReplace=$('csvReplace'),
-          blackoutBlock=$('blackoutBlock'), blackoutText=$('blackoutText'),
-          saveBlackoutBtn=$('saveBlackoutBtn'), sampleBlackoutBtn=$('sampleBlackoutBtn'),
-          exportCsvBtn=$('exportCsvBtn'), resetBtn=$('resetBtn'),
-          roomBlockInput=$('roomBlockInput'), roomNameInput=$('roomNameInput'),
-          roomMetaSaveBtn=$('roomMetaSaveBtn'), roomDeleteBtn=$('roomDeleteBtn'),
-          blockRenameOld=$('blockRenameOld'), blockRenameNew=$('blockRenameNew'), blockRenameBtn=$('blockRenameBtn');
-
-    // ======= Tabs =======
-    document.querySelectorAll('.tab-btn').forEach(btn=>{
-      btn.addEventListener('click', ()=>{
-        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
-        document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
-        btn.classList.add('active');
-        document.getElementById(btn.dataset.tab).classList.add('active');
-      });
-    });
-
-    // ======= Rendering (shared) =======
-    function blocksList(){
-      return [...new Set(rooms.map(r=>r.block))].sort();
-    }
-    function renderBlocksInto(selectEl){
-      const blocks = blocksList();
-      selectEl.innerHTML = '<option value="">All Blocks</option>'+blocks.map(b=>`<option value="${b}">${b}</option>`).join('');
-    }
-    function renderBlockFilter(){
-      renderBlocksInto(blockFilter);
-      renderBlocksInto(availBlock);
-      // Admin block dropdowns
-      const blocks = blocksList();
-      blackoutBlock.innerHTML = blocks.map(b=>`<option value="${b}">${b}</option>`).join('');
-      blockRenameOld.innerHTML = blocks.map(b=>`<option value="${b}">${b}</option>`).join('');
-      if(!blackoutBlock.value && blocks.length) blackoutBlock.value = blocks[0];
-      if(!blockRenameOld.value && blocks.length) blockRenameOld.value = blocks[0];
-      renderBlackoutEditor();
-    }
-    function renderRoomsList(){
-      const sel = roomsList.value;
-      roomsList.innerHTML = '';
-      sortBy(rooms, r=>`${r.block}-${r.name}`).forEach(r=>{
-        const o=document.createElement('option');
-        o.value=r.id; o.textContent=`${r.block} / ${r.name} — (${r.ranges.length})`;
-        roomsList.appendChild(o);
-      });
-      if(sel && [...roomsList.options].some(o=>o.value===sel)) roomsList.value=sel;
-      renderRangesEditor();
-      renderRoomMetaEditor();
-    }
-    function renderRangesEditor(){
-      const id=roomsList.value; const room=rooms.find(r=>r.id===id);
-      if(!room){ rangesText.value=''; return; }
-      const merged = mergeRanges(room.ranges);
-      rangesText.value = merged.map(r=>`${r.from} to ${r.to}`).join('\n');
-    }
-    function renderRoomMetaEditor(){
-      const id=roomsList.value; const room=rooms.find(r=>r.id===id);
-      if(!room){ roomBlockInput.value=''; roomNameInput.value=''; return; }
-      roomBlockInput.value = room.block;
-      roomNameInput.value  = room.name;
-    }
-    function renderBlackoutEditor(){
-      const blk = blackoutBlock.value;
-      const merged = mergeRanges((blackouts[blk] || []));
-      blackoutText.value = merged.map(r=>`${r.from} to ${r.to}`).join('\n');
-    }
-
-    // ======= Booking flow =======
-    function availableRoomsFor(from,to,blockSel){
-      return rooms.filter(r=>{
-        if(blockSel && r.block!==blockSel) return false;
-        const eff = effectiveRanges(r);
-        if(!unionContainsRange(eff, from, to)) return false;
-        return true;
-      }).sort((a,b)=> a.block.localeCompare(b.block) || a.name.localeCompare(b.name));
-    }
-    function renderRoomSelect(){
-      roomAvailHint.textContent = '';
-      const f=fromDate.value, t=toDate.value;
-      roomSelect.innerHTML='';
-      if(!(validDate(f)&&validDate(t)) || !(parseISO(f) < parseISO(t))){
-        roomSelect.innerHTML='<option value="">Select valid dates first</option>'; roomSelect.disabled=true; return;
-      }
-      const avail = availableRoomsFor(f,t, blockFilter.value);
-      if(avail.length===0){
-        roomSelect.innerHTML = `<option value="">No rooms available on ${f} → ${t}</option>`; roomSelect.disabled=true;
-      } else {
-        roomSelect.innerHTML = ['<option value="">Select a room</option>']
-          .concat(avail.map(r=>`<option value="${r.id}">${r.block} — ${r.name}</option>`)).join('');
-        roomSelect.disabled=false;
-      }
-    }
-    function showRoomHint(room){
-      if(!room){ roomAvailHint.textContent=''; return; }
-      const eff = effectiveRanges(room);
-      const sample = eff.slice(0,5).map(r=>`${r.from} → ${r.to}`).join(' | ');
-      const more = eff.length>5 ? ` (+${eff.length-5} more)` : '';
-      roomAvailHint.textContent = eff.length ? `Available now: ${sample}${more}` : 'No available ranges remaining.';
-    }
-    function explainDisabled(){
-      const reasons = [];
-      const f = fromDate.value, t = toDate.value;
-      const roomId = roomSelect.value;
-      const name = guestName.value.trim();
-      const phone = guestPhone.value.trim();
-
-      if(!validDate(f) || !validDate(t) || !(parseISO(f) < parseISO(t))) reasons.push('Pick a valid From and To');
-      if(!roomId) reasons.push('Choose a room');
-      if(name.length < 2) reasons.push('Enter guest name');
-      if(!/^[0-9+\-\s()]{7,}$/.test(phone)) reasons.push('Enter a valid phone');
-
-      if(roomId && validDate(f) && validDate(t) && (parseISO(f) < parseISO(t))){
-        const room = rooms.find(r=>r.id===roomId);
-        const eff = effectiveRanges(room);
-        if(!unionContainsRange(eff, f, t)) reasons.push('Room not available for the entire range');
-      }
-
-      whyDisabled.textContent = reasons.length ? ('Can’t book: ' + reasons.join(' • ')) : '';
-    }
-    function validate(){
-      const f=fromDate.value, t=toDate.value, roomId=roomSelect.value;
-      const name=guestName.value.trim(), phone=guestPhone.value.trim();
-
-      let ok = validDate(f)&&validDate(t)&&(parseISO(f)<parseISO(t)) && !!roomId && name.length>=2 && /^[0-9+\-\s()]{7,}$/.test(phone);
-      if(ok){
-        const room = rooms.find(r=>r.id===roomId);
-        const eff = effectiveRanges(room);
-        ok = unionContainsRange(eff, f, t);
-      }
-      bookBtn.disabled = !ok;
-      explainDisabled();
-    }
-    function nextAvailableRangeForRoom(room, minFrom, nightsNeeded){
-      const m = parseISO(minFrom), neededMs = nightsNeeded*86400000;
-      const eff = effectiveRanges(room);
-      for(const r of eff){
-        let start = parseISO(r.from);
-        if(start < m) start = m;
-        const endCandidate = new Date(start.getTime() + neededMs);
-        if(endCandidate <= parseISO(r.to)){ return {from: fmtISO(start), to: fmtISO(endCandidate)}; }
-      }
-      return null;
-    }
-    function book(){
-      if(bookBtn.disabled) return;
-      const room = rooms.find(r=>r.id===roomSelect.value);
-      const entry = {
-        id:'bk_'+crypto.randomUUID(), from: fromDate.value, to: toDate.value,
-        roomId: room.id, block: room.block, roomName: room.name,
-        guestName: guestName.value.trim(), guestPhone: guestPhone.value.trim(),
-        createdAt: new Date().toISOString()
-      };
-      bookings.push(entry); saveBookings(bookings);
-      guestName.value=''; guestPhone.value='';
-      renderRoomSelect(); renderBookings(); renderAvailableList(); validate();
-      alert(`Booked ${room.block} — ${room.name} for ${entry.from} → ${entry.to} (${nights(entry.from,entry.to)} nights).`);
-    }
-    function renderBookings(){
-      bookingTbody.innerHTML='';
-      if(!bookings.length){
-        bookingTbody.innerHTML = `<tr><td colspan="9" class="muted">No bookings yet.</td></tr>`; return;
-      }
-      sortBy(bookings, b=>`${b.from}-${b.block}-${b.roomName}`).forEach((bk,i)=>{
-        const tr=document.createElement('tr');
-        tr.innerHTML = `
-          <td>${i+1}</td><td>${bk.from}</td><td>${bk.to}</td><td>${nights(bk.from,bk.to)}</td>
-          <td>${bk.block}</td><td>${bk.roomName}</td><td>${bk.guestName}</td><td>${bk.guestPhone}</td>
-          <td><button data-id="${bk.id}" class="cancelBtn">Cancel</button></td>`;
-        bookingTbody.appendChild(tr);
-      });
-      bookingTbody.querySelectorAll('.cancelBtn').forEach(btn=>{
-        btn.addEventListener('click', e=>{
-          const id=e.target.getAttribute('data-id');
-          bookings=bookings.filter(b=>b.id!==id); saveBookings(bookings);
-          renderRoomSelect(); renderBookings(); renderAvailableList(); validate();
-        });
-      });
-    }
-
-    // ======= Available view =======
-    function nextSlotFromToday(room){
-      const today = parseISO(fmtISO(new Date())); // strip time
-      const eff = effectiveRanges(room).filter(r => parseISO(r.to) > today);
-      if(!eff.length) return null;
-      const first = eff[0];
-      const start = parseISO(first.from) < today ? today : parseISO(first.from);
-      return {from: fmtISO(start), to: first.to};
-    }
-    function renderAvailableList(){
-      const blk = availBlock.value;
-      const includeNoAvail = showNoAvail.checked;
-      const rows = [];
-
-      rooms.forEach(r => {
-        if(blk && r.block !== blk) return;
-        const slot = nextSlotFromToday(r);
-        if(slot){ rows.push({room:r, slot}); }
-        else if(includeNoAvail){ rows.push({room:r, slot:null}); }
-      });
-
-      rows.sort((a,b)=>{
-        if(a.slot && b.slot){
-          if(a.slot.from === b.slot.from) return (a.room.block+a.room.name).localeCompare(b.room.block+b.room.name);
-          return a.slot.from < b.slot.from ? -1 : 1;
-        }
-        if(a.slot && !b.slot) return -1;
-        if(!a.slot && b.slot) return 1;
-        return (a.room.block+a.room.name).localeCompare(b.room.block+b.room.name);
-      });
-
-      availTbody.innerHTML='';
-      if(!rows.length){
-        availTbody.innerHTML = `<tr><td colspan="7" class="muted">No rooms match.</td></tr>`;
-        availCount.textContent = '0 found';
-        return;
-      }
-      rows.forEach((it,i)=>{
-        const r = it.room, slot = it.slot;
+      adminRows.innerHTML = '';
+      (data || []).forEach(r => {
+        const allocated = r.allocations && r.allocations.length > 0;
         const tr = document.createElement('tr');
-        const nightsText = slot ? nights(slot.from, slot.to) : '—';
-        const fromText = slot ? slot.from : '—';
-        const toText = slot ? slot.to : '—';
-        const action = slot
-          ? `<button class="ghost useForBookingBtn" data-room="${r.id}" data-from="${slot.from}" data-to="${slot.to}">Use in Booking</button>
-             <button class="ghost viewAllRangesBtn" data-room="${r.id}">View Ranges</button>`
-          : `<button class="ghost viewAllRangesBtn" data-room="${r.id}">View Ranges</button>`;
+        const room = r.rooms?.room_no ?? '?';
+        const block = r.rooms?.block_name ?? '?';
         tr.innerHTML = `
-          <td>${i+1}</td>
-          <td>${r.block}</td>
-          <td>${r.name}</td>
-          <td>${fromText}</td>
-          <td>${toText}</td>
-          <td>${nightsText}</td>
-          <td>${action}</td>
-        `;
-        availTbody.appendChild(tr);
+          <td>${r.booking_id}</td>
+          <td>${block}</td>
+          <td>${room}</td>
+          <td>${r.start_date}</td>
+          <td>${r.end_date}</td>
+          <td><span class="pill ${allocated ? 'warn' : 'ok'}">${allocated ? 'Allocated' : 'Available'}</span></td>
+          <td><button data-id="${r.id}" class="del">Delete</button></td>`;
+        adminRows.appendChild(tr);
       });
-      availCount.textContent = `${rows.filter(x=>x.slot).length} available${showNoAvail.checked ? ` / ${rows.length}`:''}`;
 
-      availTbody.querySelectorAll('.useForBookingBtn').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          fromDate.value = btn.getAttribute('data-from');
-          toDate.value = btn.getAttribute('data-to');
-          blockFilter.value = availBlock.value || '';
-          renderRoomSelect();
-          roomSelect.value = btn.getAttribute('data-room');
-          const r = rooms.find(x=>x.id===roomSelect.value);
-          if(r) showRoomHint(r);
-          validate();
-          document.querySelector('.tab-btn[data-tab="bookTab"]').click();
-        });
-      });
-      availTbody.querySelectorAll('.viewAllRangesBtn').forEach(btn=>{
-        btn.addEventListener('click', ()=>{
-          const r = rooms.find(x=>x.id===btn.getAttribute('data-room'));
-          const eff = effectiveRanges(r);
-          if(!eff.length){ alert('No upcoming availability.'); return; }
-          const lines = eff.slice(0,10).map(x=>`${x.from} → ${x.to}`).join('\n');
-          alert(`Availability for ${r.block} — ${r.name}\n\n${lines}${eff.length>10?`\n…(+${eff.length-10} more)`:''}`);
-        });
+      // Delete handlers
+      adminRows.querySelectorAll('button.del').forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute('data-id');
+          if (!confirm('Delete this slot? (Any allocation will also be removed)')) return;
+          const { error } = await sb.from('room_availability').delete().eq('id', id);
+          if (error) alert('Delete failed: ' + error.message);
+          else loadAdminRows();
+        };
       });
     }
 
-    // ======= Admin lock =======
-    function getPin(){ return localStorage.getItem(LS_KEYS.ADMIN_PIN) || '1234'; }
-    function setPin(pin){ localStorage.setItem(LS_KEYS.ADMIN_PIN, pin); }
-    function setAdminUI(){
-      adminStatus.textContent = adminUnlocked ? 'Unlocked' : 'Locked';
-      adminStatus.style.background = adminUnlocked ? 'linear-gradient(90deg,#27ecb8,#6dd3ff)' : '';
-      const toDisable = adminContent.querySelectorAll('input,select,textarea,button');
-      toDisable.forEach(el=>{
-        if(el === adminUnlockBtn || el === adminLockBtn || el === adminPinInput || el === adminPinSetBtn) return;
-        el.disabled = !adminUnlocked;
-      });
-      adminContent.classList.toggle('admin-locked', !adminUnlocked);
-    }
+    // Allocate: find & allocate
+    const uBooking = document.getElementById('u-booking');
+    const uBlock   = document.getElementById('u-block');
+    const uDate    = document.getElementById('u-date');
+    const btnFind  = document.getElementById('btn-find');
+    const userRows = document.getElementById('user-rows');
+    const uMsg     = document.getElementById('user-msg');
 
-    // ======= Admin: Room meta (rename/move/delete) =======
-    function isRoomNameTaken(block, name, exceptId){
-      return rooms.some(r => r.block===block && r.name===name && r.id!==exceptId);
-    }
-    function renameMoveRoom(){
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const id = roomsList.value; if(!id){ alert('Select a room.'); return; }
-      const idx = rooms.findIndex(r=>r.id===id);
-      const newBlock = uc(roomBlockInput.value); const newName = roomNameInput.value.trim();
-      if(!newBlock){ alert('Block is required.'); return; }
-      if(!newName){ alert('Room name is required.'); return; }
-      if(isRoomNameTaken(newBlock, newName, id)){ alert(`A room named "${newName}" already exists in block ${newBlock}.`); return; }
+    btnFind.onclick = async () => {
+      uMsg.textContent = '';
+      const day = uDate.value;
+      if (!day) { uMsg.textContent = 'Select a date to search.'; return; }
 
-      const oldBlock = rooms[idx].block, oldName = rooms[idx].name;
-      rooms[idx].block = newBlock; rooms[idx].name = newName; saveRooms(rooms);
+      let q = sb.from('room_availability')
+        .select('id, booking_id, start_date, end_date, rooms:room_id(id, block_name, room_no), allocations(id)')
+        .lte('start_date', day)
+        .gte('end_date', day)
+        .order('start_date', { ascending: true });
 
-      // update bookings for this room
-      bookings.forEach(b => { if(b.roomId===id){ b.block=newBlock; b.roomName=newName; }});
-      saveBookings(bookings);
+      const bkg = uBooking.value.trim();
+      const blk = uBlock.value.trim();
+      if (bkg) q = q.eq('booking_id', bkg);
+      if (blk) q = q.eq('rooms.block_name', blk);
 
-      alert(`Room updated: ${oldBlock}/${oldName} → ${newBlock}/${newName}`);
-      renderBlockFilter(); renderRoomsList(); renderRoomSelect(); renderAvailableList(); renderBookings();
-    }
-    function deleteRoom(){
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const id = roomsList.value; if(!id){ alert('Select a room.'); return; }
-      const room = rooms.find(r=>r.id===id);
-      const used = bookings.filter(b=>b.roomId===id).length;
-      let ok = true;
-      if(used>0){
-        ok = confirm(`This room has ${used} booking(s). Delete the room and REMOVE those bookings?`);
-      }else{
-        ok = confirm(`Delete ${room.block}/${room.name}?`);
-      }
-      if(!ok) return;
-      // remove bookings for this room
-      if(used>0){ bookings = bookings.filter(b=>b.roomId!==id); saveBookings(bookings); }
-      // remove room
-      rooms = rooms.filter(r=>r.id!==id); saveRooms(rooms);
-      alert('Room deleted.');
-      renderBlockFilter(); renderRoomsList(); renderRoomSelect(); renderAvailableList(); renderBookings();
-    }
+      const { data, error } = await q;
+      if (error) { userRows.innerHTML = `<tr><td colspan="5">${error.message}</td></tr>`; return; }
 
-    // ======= Admin: Rename Block =======
-    function renameBlockAll(){
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const oldB = blockRenameOld.value; const newB = uc(blockRenameNew.value);
-      if(!oldB){ alert('Choose an old block.'); return; }
-      if(!newB){ alert('Enter a new block.'); return; }
-      if(oldB === newB){ alert('Old and new block are the same.'); return; }
+      const available = (data || []).filter(r => !r.allocations || r.allocations.length === 0);
 
-      // check name collisions
-      const oldRooms = rooms.filter(r=>r.block===oldB);
-      const conflicts = oldRooms.filter(r => rooms.some(o => o.block===newB && o.name===r.name && o.id!==r.id));
-      if(conflicts.length){
-        const sample = conflicts.slice(0,5).map(r=>r.name).join(', ');
-        alert(`Cannot rename: ${conflicts.length} room name(s) already exist in block ${newB}. Conflicts: ${sample}${conflicts.length>5?'…':''}`);
+      if (available.length === 0) {
+        userRows.innerHTML = '<tr><td colspan="5">No available rooms for the chosen filters/date.</td></tr>';
         return;
       }
-      if(!confirm(`Rename block ${oldB} → ${newB}? This updates ${oldRooms.length} room(s), their bookings, and transfers blackouts.`)) return;
 
-      // update rooms
-      rooms.forEach(r => { if(r.block===oldB) r.block=newB; });
-      saveRooms(rooms);
-
-      // update bookings
-      bookings.forEach(b=>{
-        const rm = rooms.find(r=>r.id===b.roomId);
-        if(rm) b.block = rm.block;
+      userRows.innerHTML = '';
+      available.forEach(r => {
+        const tr = document.createElement('tr');
+        const room = r.rooms?.room_no ?? '?';
+        const block = r.rooms?.block_name ?? '?';
+        tr.innerHTML = `
+          <td>${r.booking_id}</td>
+          <td>${block}</td>
+          <td>${room}</td>
+          <td>${r.start_date} → ${r.end_date}</td>
+          <td>
+            <div class="row">
+              <input placeholder="Guest name" data-gn="${r.id}" />
+              <input placeholder="Mobile" data-mb="${r.id}" />
+              <button class="primary" data-alloc="${r.id}">Allocate</button>
+            </div>
+          </td>`;
+        userRows.appendChild(tr);
       });
-      saveBookings(bookings);
 
-      // move blackouts
-      const merged = mergeRanges((blackouts[newB]||[]).concat(blackouts[oldB]||[]));
-      if(blackouts[oldB]) delete blackouts[oldB];
-      if(merged.length) blackouts[newB] = merged;
-      saveBlackouts(blackouts);
+      userRows.querySelectorAll('button[data-alloc]').forEach(btn => {
+        btn.onclick = async () => {
+          const id = btn.getAttribute('data-alloc');
+          const g = userRows.querySelector(`input[data-gn="${id}"]`).value.trim();
+          const m = userRows.querySelector(`input[data-mb="${id}"]`).value.trim();
+          if (!g || !m) { alert('Enter guest name and mobile'); return; }
 
-      alert('Block renamed.');
-      blockRenameNew.value='';
-      renderBlockFilter(); renderRoomsList(); renderRoomSelect(); renderAvailableList(); renderBookings();
-    }
-
-    // ======= CSV =======
-    function parseCsv(text){
-      const lines = text.split(/\r?\n/).map(s=>s.trim()).filter(Boolean);
-      const rows=[];
-      for(const ln of lines){
-        const parts = ln.split(',').map(s=>s.trim());
-        if(parts[0]?.toLowerCase() === 'block') continue;
-        if(parts.length<4) continue;
-        const [block, roomName, from, to] = parts;
-        if(!block || !roomName || !validDate(from) || !validDate(to) || !(parseISO(from)<parseISO(to))) continue;
-        rows.push({block, roomName, from, to});
-      }
-      return rows;
-    }
-    function importCsvRows(rows, replace){
-      const key = (b,n)=> `${b}||${n}`;
-      const map = new Map(rooms.map(r=>[key(r.block,r.name), r]));
-      const grouped = {};
-      for(const r of rows){
-        const k=key(r.block,r.roomName);
-        if(!grouped[k]) grouped[k]=[];
-        grouped[k].push({from:r.from, to:r.to});
-      }
-      for(const k of Object.keys(grouped)){
-        let room = map.get(k);
-        const [block,name] = k.split('||');
-        if(!room){
-          room = {id:crypto.randomUUID(), block, name, ranges:[]};
-          rooms.push(room); map.set(k, room);
-        }
-        if(replace){ room.ranges = mergeRanges(grouped[k]); }
-        else { room.ranges = mergeRanges((room.ranges||[]).concat(grouped[k])); }
-      }
-      saveRooms(rooms);
-      renderRoomsList(); renderRoomSelect(); renderAvailableList();
-    }
-
-    // ======= Events (BOOK) =======
-    blockFilter.addEventListener('change', ()=>{ renderRoomSelect(); validate(); });
-    fromDate.addEventListener('change', ()=>{ renderRoomSelect(); validate(); });
-    toDate.addEventListener('change',   ()=>{ renderRoomSelect(); validate(); });
-    roomSelect.addEventListener('change', ()=>{ const room=rooms.find(r=>r.id===roomSelect.value); showRoomHint(room); validate(); });
-    guestName.addEventListener('input', validate);
-    guestPhone.addEventListener('input', validate);
-    suggestBtn.addEventListener('click', ()=>{
-      const room = rooms.find(r=>r.id===roomSelect.value);
-      if(!room){ alert('Select a room first.'); return; }
-      const f = validDate(fromDate.value) ? fromDate.value : fmtISO(new Date());
-      const n = (validDate(fromDate.value)&&validDate(toDate.value)&&parseISO(fromDate.value)<parseISO(toDate.value))
-        ? nights(fromDate.value,toDate.value) : 1;
-      const s = nextAvailableRangeForRoom(room, f, Math.max(1,n));
-      if(s){ fromDate.value=s.from; toDate.value=s.to; renderRoomSelect(); showRoomHint(room); validate(); }
-      else alert('No continuous availability found for this room.');
-    });
-    bookBtn.addEventListener('click', book);
-
-    // ======= Events (AVAILABLE) =======
-    availRefreshBtn.addEventListener('click', renderAvailableList);
-    availBlock.addEventListener('change', renderAvailableList);
-    showNoAvail.addEventListener('change', renderAvailableList);
-
-    // ======= Events (ADMIN) =======
-    adminUnlockBtn.addEventListener('click', ()=>{
-      const pin = adminPinInput.value.trim();
-      if(!pin){ alert('Enter PIN'); return; }
-      if(pin === getPin()){ adminUnlocked = true; setAdminUI(); }
-      else alert('Incorrect PIN');
-    });
-    adminLockBtn.addEventListener('click', ()=>{ adminUnlocked = false; setAdminUI(); });
-
-    adminPinSetBtn.addEventListener('click', ()=>{
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const pin = adminPinInput.value.trim();
-      if(!pin || pin.length < 4){ alert('PIN must be at least 4 digits/characters.'); return; }
-      setPin(pin); alert('PIN updated.'); adminPinInput.value = '';
-    });
-
-    roomsList.addEventListener('change', ()=>{ renderRangesEditor(); renderRoomMetaEditor(); });
-    addBlockRoomsBtn.addEventListener('click', ()=>{
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const block = uc(prompt('Enter Block name (e.g., G):')); if(!block) return;
-      const count = parseInt(prompt('How many rooms to add to Block '+block+'? (e.g., 20)'),10) || 0;
-      if(count<=0) return;
-      const nextIndex = (()=>{
-        const nums = rooms.filter(r=>r.block===block)
-          .map(r=> parseInt(r.name.split('-').pop(),10)).filter(n=>!isNaN(n));
-        return (nums.length?Math.max(...nums):0)+1;
-      })();
-      const newOnes=[];
-      for(let i=0;i<count;i++){
-        const name = `${block}-${String(nextIndex+i).padStart(3,'0')}`;
-        if(isRoomNameTaken(block,name)) continue;
-        newOnes.push({id:crypto.randomUUID(), block, name, ranges:[]});
-      }
-      rooms = rooms.concat(newOnes); saveRooms(rooms); renderBlockFilter(); renderRoomsList(); renderAvailableList(); renderRoomSelect();
-      alert(`Added ${newOnes.length} room(s) to Block ${block}.`);
-    });
-
-    function saveRanges(){
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const id=roomsList.value; if(!id){ alert('Select a room.'); return; }
-      const lines = rangesText.value.split(/\n+/).map(s=>s.trim()).filter(Boolean);
-      const parsed=[];
-      for(const line of lines){ const r = parseRangeLine(line); if(r) parsed.push(r); }
-      const idx=rooms.findIndex(r=>r.id===id);
-      rooms[idx].ranges = mergeRanges(parsed); saveRooms(rooms);
-      renderRoomsList(); renderRoomSelect(); renderAvailableList();
-      alert('Availability ranges saved.');
-    }
-    saveRangesBtn.addEventListener('click', saveRanges);
-    sampleRangesBtn.addEventListener('click', ()=>{
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const id=roomsList.value; if(!id){ alert('Select a room first.'); return; }
-      const base=new Date();
-      const r1f=fmtISO(base), r1t=fmtISO(new Date(base.getTime()+3*86400000));
-      const r2f=fmtISO(new Date(base.getTime()+5*86400000)), r2t=fmtISO(new Date(base.getTime()+9*86400000));
-      rangesText.value = `${r1f} to ${r1t}\n${r2f} to ${r2f>r2t?'':r2t}`;
-      rangesText.value = `${r1f} to ${r1t}\n${r2f} to ${r2t}`;
-    });
-
-    csvImportBtn.addEventListener('click', ()=>{
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const file=csvFile.files && csvFile.files[0];
-      if(!file){ alert('Choose a CSV file first.'); return; }
-      const reader=new FileReader();
-      reader.onload = () =>{
-        const rows=parseCsv(reader.result||'');
-        if(!rows.length){ alert('No valid rows found.'); return; }
-        importCsvRows(rows, csvReplace.checked);
-        alert(`Imported ${rows.length} row(s).`);
-      };
-      reader.readAsText(file);
-    });
-
-    blackoutBlock.addEventListener('change', renderBlackoutEditor);
-    saveBlackoutBtn.addEventListener('click', ()=>{
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const blk=blackoutBlock.value; if(!blk) return;
-      const lines=blackoutText.value.split(/\n+/).map(s=>s.trim()).filter(Boolean);
-      const arr=[]; for(const line of lines){ const r=parseRangeLine(line); if(r) arr.push(r); }
-      blackouts[blk]=mergeRanges(arr); saveBlackouts(blackouts);
-      renderRoomSelect(); renderAvailableList();
-      alert('Blackouts saved for block '+blk+'.');
-    });
-    sampleBlackoutBtn.addEventListener('click', ()=>{
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const base=new Date();
-      const f=fmtISO(new Date(base.getTime()+4*86400000));
-      const t=fmtISO(new Date(base.getTime()+6*86400000));
-      blackoutText.value = `${f} to ${t}`;
-    });
-
-    roomMetaSaveBtn.addEventListener('click', renameMoveRoom);
-    roomDeleteBtn.addEventListener('click', deleteRoom);
-    blockRenameBtn.addEventListener('click', renameBlockAll);
-
-    exportCsvBtn.addEventListener('click', ()=>{
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      const head=['#','From','To','Nights','Block','Room','Guest','Phone'];
-      const lines=[head.join(',')];
-      sortBy(bookings,b=>`${b.from}-${b.block}-${b.roomName}`).forEach((b,i)=>{
-        lines.push([i+1,b.from,b.to,nights(b.from,b.to),b.block,b.roomName,`"${b.guestName}"`,`"${b.guestPhone}"`].join(','));
+          const { error } = await sb.from('allocations').insert({ availability_id: id, guest_name: g, mobile: m });
+          if (error) {
+            alert('Allocation failed: ' + error.message);
+          } else {
+            alert('Allocated!');
+            btnFind.click();
+          }
+        };
       });
-      const blob = new Blob([lines.join('\n')],{type:'text/csv'});
-      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download='bookings.csv'; a.click(); URL.revokeObjectURL(url);
-    });
+    };
 
-    resetBtn.addEventListener('click', ()=>{
-      if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      if(confirm('This will clear ALL rooms, bookings, and blackouts in the database. Continue?')){
-        if(typeof window.db.clearAll === 'function'){
-          window.db.clearAll().then(async ()=>{
-            rooms = await loadRooms(); bookings = await loadBookings(); blackouts = await loadBlackouts(); renderAll();
-          }).catch(err=>alert('Reset failed: '+err.message));
-        } else {
-          alert('Clear-all not available.');
-        }
-      }
-    });
-
-    // ======= Init =======
-    function renderAll(){
-      renderBlockFilter();
-      renderRoomsList();
-      renderRoomSelect();
-      renderBookings();
-      validate();
-      renderAvailableList();
-    }
-    (async function init(){
-      // Load from Supabase
-      try{
-        rooms = await loadRooms();
-        bookings = await loadBookings();
-        blackouts = await loadBlackouts();
-      }catch(err){ console.error(err); alert('Failed to load data from database: '+err.message); }
-      // Keep local admin PIN behavior
-      if(!localStorage.getItem(LS_KEYS.ADMIN_PIN)){ localStorage.setItem(LS_KEYS.ADMIN_PIN, '1234'); }
-      setAdminUI();
-      const today=new Date(), tomorrow=new Date(today.getTime()+86400000);
-      if(!fromDate.value){ fromDate.value=fmtISO(today); toDate.value=fmtISO(tomorrow); }
-      const pill = document.querySelector('h1 .pill'); if(pill) pill.textContent = 'Storage: Supabase';
-      renderAll();
-    })();
+    // Initial load
+    show('admin');
   </script>
 </body>
 </html>
