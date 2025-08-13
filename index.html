@@ -186,6 +186,13 @@
     const adminHint = document.getElementById('admin-hint');
 
     let SERVER_ADMIN_PASS = null;
+    //anusha
+    const { data, error } = await sb
+  .from('app_settings')
+  .select('value')
+  .eq('key', 'admin_password')
+  .single();
+    //
     async function fetchAdminPass() {
       const { data, error } = await sb.from('app_settings').select('value').eq('key', 'admin_pass').maybeSingle();
       if (error) { adminHint.textContent = 'Could not load admin password from Supabase.'; return; }
