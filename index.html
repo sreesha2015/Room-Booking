@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Room Allocation — Supabase Starter</title>
+  <title>Room Allocation — Supabase (Existing Rooms Schema)</title>
   <style>
     :root { --bg:#0b1220; --card:#111a2b; --muted:#8aa0c6; --text:#e9eefc; --accent:#4da3ff; --accent2:#6dd3ff; }
     *{box-sizing:border-box}
@@ -38,7 +38,7 @@
 
   <div class="wrap">
     <h1>Room Allocation</h1>
-    <div class="hint">Admin enters pre-booked slots. Users allocate rooms to guests. Double-booking is prevented.</div>
+    <div class="hint">Admin enters pre-booked slots. Users allocate rooms. Using existing rooms schema: (id, block, name, ranges, capacity, active).</div>
 
     <div class="tabs">
       <button class="tab active" id="tab-admin">Admin</button>
@@ -54,12 +54,12 @@
           <input id="a-booking" placeholder="e.g., BKG-2025-001" />
         </div>
         <div>
-          <label>Block Name</label>
+          <label>Block</label>
           <input id="a-block" placeholder="e.g., Block A" />
         </div>
         <div>
-          <label>Room No</label>
-          <input id="a-room" placeholder="e.g., 105" />
+          <label>Room Name/No</label>
+          <input id="a-room" placeholder="e.g., 105 or Deluxe-1" />
         </div>
       </div>
       <div class="grid two" style="margin-top:10px">
@@ -182,19 +182,19 @@
     btnAdd.onclick = async () => {
       aMsg.textContent = '';
       const booking_id = aBooking.value.trim();
-      const block_name = aBlock.value.trim();
-      const room_no    = aRoom.value.trim();
+      const block = aBlock.value.trim();
+      const name  = aRoom.value.trim();
       const start_date = aStart.value;
       const end_date   = aEnd.value;
-      if (!booking_id || !block_name || !room_no || !start_date || !end_date) {
+      if (!booking_id || !block || !name || !start_date || !end_date) {
         aMsg.textContent = 'Fill all fields.'; return;
       }
       if (end_date < start_date) { aMsg.textContent = 'End date cannot be before start date.'; return; }
 
-      // Upsert room
+      // Upsert room using existing columns (block, name)
       const { data: roomUpsert, error: roomErr } = await sb
         .from('rooms')
-        .upsert({ block_name, room_no }, { onConflict: 'block_name,room_no' })
+        .upsert({ block, name }, { onConflict: 'block,name' })
         .select('id')
         .single();
       if (roomErr) { aMsg.textContent = 'Room upsert failed: ' + roomErr.message; return; }
@@ -218,7 +218,7 @@
     async function loadAdminRows() {
       adminRows.innerHTML = '<tr><td colspan="7">Loading…</td></tr>';
       let q = sb.from('room_availability')
-        .select('id, booking_id, start_date, end_date, rooms:room_id(id, block_name, room_no), allocations(id)')
+        .select('id, booking_id, start_date, end_date, rooms:room_id(id, block, name), allocations(id)')
         .order('start_date', { ascending: true });
 
       const f = fBookingAdmin.value.trim();
@@ -231,12 +231,12 @@
       (data || []).forEach(r => {
         const allocated = r.allocations && r.allocations.length > 0;
         const tr = document.createElement('tr');
-        const room = r.rooms?.room_no ?? '?';
-        const block = r.rooms?.block_name ?? '?';
+        const roomName = r.rooms?.name ?? '?';
+        const block = r.rooms?.block ?? '?';
         tr.innerHTML = `
           <td>${r.booking_id}</td>
           <td>${block}</td>
-          <td>${room}</td>
+          <td>${roomName}</td>
           <td>${r.start_date}</td>
           <td>${r.end_date}</td>
           <td><span class="pill ${allocated ? 'warn' : 'ok'}">${allocated ? 'Allocated' : 'Available'}</span></td>
@@ -270,7 +270,7 @@
       if (!day) { uMsg.textContent = 'Select a date to search.'; return; }
 
       let q = sb.from('room_availability')
-        .select('id, booking_id, start_date, end_date, rooms:room_id(id, block_name, room_no), allocations(id)')
+        .select('id, booking_id, start_date, end_date, rooms:room_id(id, block, name), allocations(id)')
         .lte('start_date', day)
         .gte('end_date', day)
         .order('start_date', { ascending: true });
@@ -278,7 +278,7 @@
       const bkg = uBooking.value.trim();
       const blk = uBlock.value.trim();
       if (bkg) q = q.eq('booking_id', bkg);
-      if (blk) q = q.eq('rooms.block_name', blk);
+      if (blk) q = q.eq('rooms.block', blk);  // filter on joined column
 
       const { data, error } = await q;
       if (error) { userRows.innerHTML = `<tr><td colspan="5">${error.message}</td></tr>`; return; }
@@ -293,12 +293,12 @@
       userRows.innerHTML = '';
       available.forEach(r => {
         const tr = document.createElement('tr');
-        const room = r.rooms?.room_no ?? '?';
-        const block = r.rooms?.block_name ?? '?';
+        const roomName = r.rooms?.name ?? '?';
+        const block = r.rooms?.block ?? '?';
         tr.innerHTML = `
           <td>${r.booking_id}</td>
           <td>${block}</td>
-          <td>${room}</td>
+          <td>${roomName}</td>
           <td>${r.start_date} → ${r.end_date}</td>
           <td>
             <div class="row">

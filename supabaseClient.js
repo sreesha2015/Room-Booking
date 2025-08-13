@@ -1,5 +1,4 @@
 // supabaseClient.js — ESM module (no <script> tags here)
-// Usage: <script type="module" src="./supabaseClient.js"></script>
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 // 🔧 TODO: paste your Supabase URL & Anon Key
