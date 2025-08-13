@@ -347,22 +347,16 @@
     }
 
     // ======= Data =======
-    function loadRooms(){
-      const raw = localStorage.getItem(LS_KEYS.ROOMS);
-      if(raw) return JSON.parse(raw);
-      const blocks = ['A','B','C','D','E','F']; const arr=[];
-      blocks.forEach(b=>{ for(let i=1;i<=25;i++){ arr.push({id:crypto.randomUUID(),block:b,name:`${b}-${String(i).padStart(3,'0')}`,ranges:[]}); }});
+    function loadRooms(){ return window.db.fetchRooms(); }-${String(i).padStart(3,'0')}`,ranges:[]}); }});
       localStorage.setItem(LS_KEYS.ROOMS, JSON.stringify(arr)); return arr;
     }
-    function saveRooms(r){ localStorage.setItem(LS_KEYS.ROOMS, JSON.stringify(r)); }
-    function loadBookings(){ const raw = localStorage.getItem(LS_KEYS.BOOKINGS); return raw?JSON.parse(raw):[]; }
-    function saveBookings(b){ localStorage.setItem(LS_KEYS.BOOKINGS, JSON.stringify(b)); }
-    function loadBlackouts(){ const raw = localStorage.getItem(LS_KEYS.BLACKOUTS); return raw?JSON.parse(raw):{}; }
-    function saveBlackouts(b){ localStorage.setItem(LS_KEYS.BLACKOUTS, JSON.stringify(b)); }
+    async function saveRooms(r){ await window.db.upsertRooms(r); }
+    function loadBookings(){ return window.db.fetchBookings(); }
+    async function saveBookings(b){ /* no-op: insert/delete per operation */ }
+    function loadBlackouts(){ return window.db.fetchBlackouts(); }; }
+    async function saveBlackouts(b){ await window.db.saveBlackouts(b); }
 
-    let rooms = loadRooms();
-    let bookings = loadBookings();
-    let blackouts = loadBlackouts();
+    let rooms=[]; let bookings=[]; let blackouts={};
     let adminUnlocked = false;
 
     // ======= UI Refs (BOOK) =======
@@ -910,11 +904,14 @@
 
     resetBtn.addEventListener('click', ()=>{
       if(!adminUnlocked){ alert('Unlock admin first'); return; }
-      if(confirm('This will clear ALL rooms, bookings, and blackouts. Continue?')){
-        localStorage.removeItem(LS_KEYS.ROOMS);
-        localStorage.removeItem(LS_KEYS.BOOKINGS);
-        localStorage.removeItem(LS_KEYS.BLACKOUTS);
-        rooms=loadRooms(); bookings=loadBookings(); blackouts=loadBlackouts(); renderAll();
+      if(confirm('This will clear ALL rooms, bookings, and blackouts in the database. Continue?')){
+        if(typeof window.db.clearAll === 'function'){
+          window.db.clearAll().then(async ()=>{
+            rooms = await loadRooms(); bookings = await loadBookings(); blackouts = await loadBlackouts(); renderAll();
+          }).catch(err=>alert('Reset failed: '+err.message));
+        } else {
+          alert('Clear-all not available.');
+        }
       }
     });
 
@@ -927,11 +924,19 @@
       validate();
       renderAvailableList();
     }
-    (function init(){
+    (async function init(){
+      // Load from Supabase
+      try{
+        rooms = await loadRooms();
+        bookings = await loadBookings();
+        blackouts = await loadBlackouts();
+      }catch(err){ console.error(err); alert('Failed to load data from database: '+err.message); }
+      // Keep local admin PIN behavior
       if(!localStorage.getItem(LS_KEYS.ADMIN_PIN)){ localStorage.setItem(LS_KEYS.ADMIN_PIN, '1234'); }
       setAdminUI();
       const today=new Date(), tomorrow=new Date(today.getTime()+86400000);
       if(!fromDate.value){ fromDate.value=fmtISO(today); toDate.value=fmtISO(tomorrow); }
+      const pill = document.querySelector('h1 .pill'); if(pill) pill.textContent = 'Storage: Supabase';
       renderAll();
     })();
   </script>
