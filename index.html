@@ -274,7 +274,8 @@
     </section>
   </div>
 
-  <script>
+  <script type="module">
+    import { db } from './supabase-client.js'; window.db = window.db || db;
     // ======= Storage Keys =======
     const LS_KEYS = {
       ROOMS: 'rb7_rooms_v1',
