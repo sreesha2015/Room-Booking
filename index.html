@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Room Allocation — Supabase (Existing Rooms Schema)</title>
+  <title>Room Allocation — Supabase (rb7-aligned)</title>
   <style>
     :root { --bg:#0b1220; --card:#111a2b; --muted:#8aa0c6; --text:#e9eefc; --accent:#4da3ff; --accent2:#6dd3ff; }
     *{box-sizing:border-box}
@@ -36,46 +36,16 @@
 
   <div class="wrap">
     <h1>Room Allocation</h1>
-    <div class="hint">Using existing rooms schema: (id, block, name, ranges, capacity, active)</div>
+    <div class="hint">rb7-aligned: effective availability (split by day), CSV import, blackouts.</div>
 
     <div class="tabs">
-     
-      <button class="tab" id="tab-allocate">Allocate</button>
+      <button class="tab active" id="tab-allocate">Allocate</button>
       <button class="tab" id="tab-available">Available</button>
       <button class="tab" id="tab-allocated">Allocated</button>
-       <button class="tab active" id="tab-admin">Admin</button>
+      <button class="tab" id="tab-admin">Admin</button>
     </div>
 
-    <section id="admin" class="card">
-      <h2>Admin — Add Pre‑Booked Slot</h2>
-      <div class="grid three">
-        <div><label>Booking ID</label><input id="a-booking" placeholder="e.g., BKG-2025-001" /></div>
-        <div><label>Block</label><input id="a-block" placeholder="e.g., Block A" /></div>
-        <div><label>Room Name/No</label><input id="a-room" placeholder="e.g., 105 or Deluxe-1" /></div>
-      </div>
-      <div class="grid two" style="margin-top:10px">
-        <div><label>Start Date</label><input type="date" id="a-start" /></div>
-        <div><label>End Date</label><input type="date" id="a-end" /></div>
-      </div>
-      <div class="row" style="margin-top:12px">
-        <button id="btn-add" class="primary">Add Slot</button>
-        <div id="admin-msg" class="hint"></div>
-      </div>
-
-      <div class="spacer"></div>
-      <h3>All Slots</h3>
-      <div class="row">
-        <input id="f-booking-admin" placeholder="Filter by Booking ID (optional)" style="max-width:260px" />
-        <button id="btn-reload-admin">Reload</button>
-      </div>
-      <div class="spacer"></div>
-      <table>
-        <thead><tr><th>Booking ID</th><th>Block</th><th>Room</th><th>Start</th><th>End</th><th>Status</th><th></th></tr></thead>
-        <tbody id="admin-rows"></tbody>
-      </table>
-    </section>
-
-    <section id="allocate" class="card" style="display:none">
+    <section id="allocate" class="card">
       <h2>Allocate — Assign Room to Guest</h2>
       <div class="grid three">
         <div><label>Booking ID (filter)</label><input id="u-booking" placeholder="e.g., BKG-2025-001" /></div>
@@ -128,6 +98,45 @@
         <tbody id="allocated-rows"></tbody>
       </table>
     </section>
+
+    <section id="admin" class="card" style="display:none">
+      <h2>Admin — Add Pre‑Booked Slot / CSV / Blackouts</h2>
+      <div class="grid three">
+        <div><label>Booking ID</label><input id="a-booking" placeholder="e.g., BKG-2025-001" /></div>
+        <div><label>Block</label><input id="a-block" placeholder="e.g., Block A" /></div>
+        <div><label>Room Name/No</label><input id="a-room" placeholder="e.g., 105 or Deluxe-1" /></div>
+      </div>
+      <div class="grid two" style="margin-top:10px">
+        <div><label>Start Date</label><input type="date" id="a-start" /></div>
+        <div><label>End Date</label><input type="date" id="a-end" /></div>
+      </div>
+      <div class="row" style="margin-top:12px">
+        <button id="btn-add" class="primary">Add Slot</button>
+        <div id="admin-msg" class="hint"></div>
+      </div>
+
+      <div class="spacer"></div>
+      <div class="row">
+        <div>
+          <label>CSV Import (booking_id,block,room,start_date,end_date)</label>
+          <input type="file" id="csv-file" accept=".csv" />
+        </div>
+        <button id="btn-import">Import CSV</button>
+        <div class="hint">Rows with booking_id = BLACKOUT will be treated as blackout (non-allocatable).</div>
+      </div>
+
+      <div class="spacer"></div>
+      <h3>All Slots</h3>
+      <div class="row">
+        <input id="f-booking-admin" placeholder="Filter by Booking ID (optional)" style="max-width:260px" />
+        <button id="btn-reload-admin">Reload</button>
+      </div>
+      <div class="spacer"></div>
+      <table>
+        <thead><tr><th>Booking ID</th><th>Block</th><th>Room</th><th>Start</th><th>End</th><th>Status</th><th></th></tr></thead>
+        <tbody id="admin-rows"></tbody>
+      </table>
+    </section>
   </div>
 
   <script type="module">
@@ -137,11 +146,12 @@
     });
     const sb = await waitForSB();
 
+    // Tabs (Admin last)
     const tabs = {
-      admin: { tab: document.getElementById('tab-admin'), section: document.getElementById('admin') },
       allocate: { tab: document.getElementById('tab-allocate'), section: document.getElementById('allocate') },
       available: { tab: document.getElementById('tab-available'), section: document.getElementById('available') },
       allocated: { tab: document.getElementById('tab-allocated'), section: document.getElementById('allocated') },
+      admin: { tab: document.getElementById('tab-admin'), section: document.getElementById('admin') },
     };
     function show(which) {
       for (const k in tabs) {
@@ -153,12 +163,18 @@
       if (which === 'available') loadAvailableRows();
       if (which === 'allocated') loadAllocatedRows();
     }
-    tabs.admin.tab.onclick = () => show('admin');
     tabs.allocate.tab.onclick = () => show('allocate');
     tabs.available.tab.onclick = () => show('available');
     tabs.allocated.tab.onclick = () => show('allocated');
+    tabs.admin.tab.onclick = () => show('admin');
 
-    // Admin add
+    // --- Helpers
+    const fmt = (d)=> new Date(d+'T00:00:00').toISOString().slice(0,10);
+    const addDays = (d, n)=> {
+      const dt = new Date(d+'T00:00:00'); dt.setDate(dt.getDate()+n); return dt.toISOString().slice(0,10);
+    };
+
+    // --- Admin add
     const aBooking = document.getElementById('a-booking');
     const aBlock   = document.getElementById('a-block');
     const aRoom    = document.getElementById('a-room');
@@ -182,6 +198,28 @@
       aMsg.textContent = 'Slot added.'; aRoom.value = ''; aStart.value = ''; aEnd.value = ''; loadAdminRows();
     };
 
+    // CSV import
+    const csvFile = document.getElementById('csv-file');
+    document.getElementById('btn-import').onclick = async () => {
+      const file = csvFile.files?.[0];
+      if (!file) { alert('Choose a CSV file first.'); return; }
+      const text = await file.text();
+      // simple CSV parse (no commas inside fields expected)
+      const rows = text.split(/\r?\n/).map(l=>l.trim()).filter(Boolean).map(line=>line.split(','));
+      let ok=0, fail=0, msgs=[];
+      for (let i=0;i<rows.length;i++){
+        const [booking_id, block, name, start_date, end_date] = rows[i].map(x=>x?.trim());
+        if (!booking_id || !block || !name || !start_date || !end_date) { fail++; msgs.push('Row '+(i+1)+' skipped (missing fields)'); continue; }
+        const { data: roomUpsert, error: roomErr } = await sb.from('rooms').upsert({ block, name }, { onConflict: 'block,name' }).select('id').single();
+        if (roomErr) { fail++; msgs.push('Row '+(i+1)+' room err: '+roomErr.message); continue; }
+        const { error: avErr } = await sb.from('room_availability').insert({ room_id: roomUpsert.id, booking_id, start_date, end_date });
+        if (avErr) { fail++; msgs.push('Row '+(i+1)+' availability err: '+avErr.message); continue; }
+        ok++;
+      }
+      alert(`Import finished. OK: ${ok}, Failed: ${fail}${msgs.length? '\n' + msgs.slice(0,5).join('\n') + (msgs.length>5?'\n…':''):''}`);
+      loadAdminRows();
+    };
+
     // Admin list
     const adminRows = document.getElementById('admin-rows');
     const fBookingAdmin = document.getElementById('f-booking-admin');
@@ -195,9 +233,10 @@
       adminRows.innerHTML = '';
       (data || []).forEach(r => {
         const allocated = r.allocations && r.allocations.length > 0;
+        const isBlackout = (r.booking_id || '').toUpperCase() === 'BLACKOUT';
         const tr = document.createElement('tr');
         tr.innerHTML = `<td>${r.booking_id}</td><td>${r.rooms?.block ?? '?'}</td><td>${r.rooms?.name ?? '?'}</td><td>${r.start_date}</td><td>${r.end_date}</td>
-                        <td><span class="pill ${allocated ? 'warn' : 'ok'}">${allocated ? 'Allocated' : 'Available'}</span></td>
+                        <td><span class="pill ${isBlackout ? 'warn' : (allocated ? 'warn' : 'ok')}">${isBlackout ? 'Blackout' : (allocated ? 'Allocated' : 'Available')}</span></td>
                         <td><button data-id="${r.id}" class="del">Delete</button></td>`;
         adminRows.appendChild(tr);
       });
@@ -211,13 +250,51 @@
       });
     }
 
-    // Allocate by date
+    // Allocate by date (effective availability by splitting the range)
     const uBooking = document.getElementById('u-booking');
     const uBlock   = document.getElementById('u-block');
     const uDate    = document.getElementById('u-date');
     const btnFind  = document.getElementById('btn-find');
     const userRows = document.getElementById('user-rows');
     const uMsg     = document.getElementById('user-msg');
+
+    async function allocateForDate(availId, day, guest, mobile){
+      // Fetch availability
+      const { data: av, error: avErr } = await sb.from('room_availability').select('id, booking_id, room_id, start_date, end_date').eq('id', availId).single();
+      if (avErr || !av) throw new Error(avErr?.message || 'Availability not found');
+      if (!(av.start_date <= day && av.end_date >= day)) throw new Error('Chosen date out of range');
+      // Blackout guard
+      if ((av.booking_id||'').toUpperCase() === 'BLACKOUT') throw new Error('Cannot allocate blackout slot');
+
+      // Pre-calc ranges
+      const leftStart = av.start_date;
+      const leftEnd = addDays(day, -1);
+      const rightStart = addDays(day, +1);
+      const rightEnd = av.end_date;
+
+      // Step 1: delete original
+      { const { error } = await sb.from('room_availability').delete().eq('id', av.id); if (error) throw new Error('Failed to split (delete): '+error.message); }
+      // Step 2: insert left (if any)
+      if (leftEnd >= leftStart){
+        const { error } = await sb.from('room_availability').insert({ room_id: av.room_id, booking_id: av.booking_id, start_date: leftStart, end_date: leftEnd });
+        if (error) throw new Error('Failed to insert left range: '+error.message);
+      }
+      // Step 3: insert right (if any)
+      if (rightEnd >= rightStart){
+        const { error } = await sb.from('room_availability').insert({ room_id: av.room_id, booking_id: av.booking_id, start_date: rightStart, end_date: rightEnd });
+        if (error) throw new Error('Failed to insert right range: '+error.message);
+      }
+      // Step 4: insert single-day range for allocation
+      const { data: mid, error: midErr } = await sb.from('room_availability').insert({ room_id: av.room_id, booking_id: av.booking_id, start_date: day, end_date: day }).select('id').single();
+      if (midErr) throw new Error('Failed to create day slot: '+midErr.message);
+
+      // Step 5: create allocation
+      const { error: allocErr } = await sb.from('allocations').insert({ availability_id: mid.id, guest_name: guest, mobile });
+      if (allocErr) throw new Error('Allocation failed: '+allocErr.message);
+
+      return true;
+    }
+
     btnFind.onclick = async () => {
       uMsg.textContent = '';
       const day = uDate.value; if (!day) { uMsg.textContent = 'Select a date to search.'; return; }
@@ -226,13 +303,14 @@
       if (bkg) q = q.eq('booking_id', bkg); if (blk) q = q.eq('rooms.block', blk);
       const { data, error } = await q;
       if (error) { userRows.innerHTML = `<tr><td colspan="5">${error.message}</td></tr>`; return; }
-      const available = (data || []).filter(r => !r.allocations || r.allocations.length === 0);
+      // Only show non-allocated and not blackout
+      const available = (data || []).filter(r => (!r.allocations || r.allocations.length === 0) && (r.booking_id||'').toUpperCase() !== 'BLACKOUT');
       if (available.length === 0) { userRows.innerHTML = '<tr><td colspan="5">No available rooms for the chosen filters/date.</td></tr>'; return; }
       userRows.innerHTML = '';
       available.forEach(r => {
         const tr = document.createElement('tr');
         tr.innerHTML = `<td>${r.booking_id}</td><td>${r.rooms?.block ?? '?'}</td><td>${r.rooms?.name ?? '?'}</td><td>${r.start_date} → ${r.end_date}</td>
-          <td><div class="row"><input placeholder="Guest name" data-gn="${r.id}" /><input placeholder="Mobile" data-mb="${r.id}" /><button class="primary" data-alloc="${r.id}">Allocate</button></div></td>`;
+          <td><div class="row"><input placeholder="Guest name" data-gn="${r.id}" /><input placeholder="Mobile" data-mb="${r.id}" /><button class="primary" data-alloc="${r.id}">Allocate ${day}</button></div></td>`;
         userRows.appendChild(tr);
       });
       userRows.querySelectorAll('button[data-alloc]').forEach(btn => {
@@ -241,13 +319,18 @@
           const g = userRows.querySelector(`input[data-gn="${id}"]`).value.trim();
           const m = userRows.querySelector(`input[data-mb="${id}"]`).value.trim();
           if (!g || !m) { alert('Enter guest name and mobile'); return; }
-          const { error } = await sb.from('allocations').insert({ availability_id: id, guest_name: g, mobile: m });
-          if (error) alert('Allocation failed: ' + error.message); else { alert('Allocated!'); btnFind.click(); }
+          try {
+            await allocateForDate(id, day, g, m);
+            alert('Allocated!');
+            btnFind.click();
+          } catch (e) {
+            alert(e.message || 'Allocation failed');
+          }
         };
       });
     };
 
-    // Available: list all unallocated
+    // Available: list all unallocated (excluding blackout for assignment)
     const avBooking = document.getElementById('av-booking');
     const avBlock   = document.getElementById('av-block');
     const avDate    = document.getElementById('av-date');
@@ -263,23 +346,34 @@
       if (day) q = q.lte('start_date', day).gte('end_date', day);
       const { data, error } = await q;
       if (error) { availableRows.innerHTML = `<tr><td colspan="5">${error.message}</td></tr>`; return; }
-      const unallocated = (data || []).filter(r => !r.allocations || r.allocations.length === 0);
+      const unallocated = (data || []).filter(r => (!r.allocations || r.allocations.length === 0));
       if (unallocated.length === 0) { availableRows.innerHTML = '<tr><td colspan="5">No unallocated slots match the filters.</td></tr>'; return; }
       availableRows.innerHTML = '';
       unallocated.forEach(r => {
+        const isBlackout = (r.booking_id || '').toUpperCase() === 'BLACKOUT';
+        const assignCell = isBlackout
+          ? '<span class="pill warn">Blackout</span>'
+          : `<div class="row"><input placeholder="Guest name" data-gn="${r.id}" /><input placeholder="Mobile" data-mb="${r.id}" /><button class="primary" data-alloc="${r.id}">Allocate (pick date above)</button></div>`;
         const tr = document.createElement('tr');
         tr.innerHTML = `<td>${r.booking_id}</td><td>${r.rooms?.block ?? '?'}</td><td>${r.rooms?.name ?? '?'}</td><td>${r.start_date} → ${r.end_date}</td>
-          <td><div class="row"><input placeholder="Guest name" data-gn="${r.id}" /><input placeholder="Mobile" data-mb="${r.id}" /><button class="primary" data-alloc="${r.id}">Allocate</button></div></td>`;
+          <td>${assignCell}</td>`;
         availableRows.appendChild(tr);
       });
       availableRows.querySelectorAll('button[data-alloc]').forEach(btn => {
         btn.onclick = async () => {
           const id = btn.getAttribute('data-alloc');
+          const day = avDate.value;
+          if (!day) { alert('Select a date filter above to allocate a specific day.'); return; }
           const g = availableRows.querySelector(`input[data-gn="${id}"]`).value.trim();
           const m = availableRows.querySelector(`input[data-mb="${id}"]`).value.trim();
           if (!g || !m) { alert('Enter guest name and mobile'); return; }
-          const { error } = await sb.from('allocations').insert({ availability_id: id, guest_name: g, mobile: m });
-          if (error) alert('Allocation failed: ' + error.message); else { alert('Allocated!'); loadAvailableRows(); }
+          try {
+            await allocateForDate(id, day, g, m);
+            alert('Allocated!');
+            loadAvailableRows();
+          } catch (e) {
+            alert(e.message || 'Allocation failed');
+          }
         };
       });
     }
@@ -318,7 +412,7 @@
     }
 
     // initial
-    show('admin');
+    show('allocate');
   </script>
 </body>
 </html>
